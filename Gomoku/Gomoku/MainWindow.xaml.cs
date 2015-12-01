@@ -21,17 +21,86 @@ namespace Gomoku
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
+
+    public enum PlayMode
+    {
+        Online,
+        Offline,
+        Machine,
+    }
     public partial class MainWindow : Window
     {
         Button[,] CaroButt;
         Socket GomokuSocket;
         bool YourTurn = false;
+        Board PlayBoard = new Board();
+        private bool isWaiting = false;
+        private bool isWin = false;
+
         public MainWindow()
         {
             InitializeComponent();
-            GomokuSocket = IO.Socket("ws://gomoku-lajosveres.rhcloud.com:8000");
+            this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            
+            Board.Notify += BoardOnNotify;
+            Board.WinNotify += BoardOnWinNotify;
+            Board.CurrentMode = PlayMode.Machine;
+            AI.AIPlaceNotify += AI_AIPlaceNotify;
+
+            ModePicker modePicker = new ModePicker() {WindowStartupLocation = WindowStartupLocation.CenterScreen};
+            if (modePicker.ShowDialog() == true)
+            {
+                Board.CurrentMode = modePicker.Mode;
+                MyName = modePicker.MyName;
+                NameTb.Text = MyName;
+                this.Title += " - " +Board.CurrentMode.ToString();
+            }
+            
         }
 
+        private void AI_AIPlaceNotify(int Row, int Col)
+        {
+            PlaceToUI(Row, Col);
+        }
+
+        private void PlaceToUI(int row, int col)
+        {
+            isWaiting = false;
+            Button Bt = CaroButt[row, col];
+            this.Dispatcher.Invoke(() =>
+            {
+                Brush BackupBackGround = Bt.Background;
+
+                if (Board.PlayingPlayer == State.Player1)
+                    Bt.Background = Brushes.Black;
+                if (Board.PlayingPlayer == State.Player2)
+                    Bt.Background = Brushes.White;
+                Mouse.OverrideCursor = null;
+            });
+        }
+
+        private void BoardOnWinNotify(State player)
+        {
+            MessageBox.Show("Player " + player.ToString() + " win!");
+            ResetButton();
+            
+            isWaiting = false;
+            isWin = true;
+            this.Dispatcher.Invoke(() =>
+            {
+                Mouse.OverrideCursor = null;
+            });
+            
+            Board.PlayingPlayer = State.Player1;
+
+            Board.ResetBoard();
+        }
+
+
+        private void BoardOnNotify(string errorString)
+        {
+            MessageBox.Show(errorString);
+        }
 
         #region Loaded
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -39,7 +108,13 @@ namespace Gomoku
             CreatePlayGround();
             ChatTb.Focus();
             MyName = NameTb.Text;
-            SocketConnect();
+            if (Board.CurrentMode == PlayMode.Online)
+            {
+                GomokuSocket = IO.Socket("ws://gomoku-lajosveres.rhcloud.com:8000");
+                SocketConnect(); //Initialze Connect
+                ChatConnect(); //Create Thread for chatting
+                GamePlayConnect(); //Create Threads for playing
+            }
         }
         
         private void CreatePlayGround()
@@ -57,7 +132,7 @@ namespace Gomoku
                     if ((i + j) % 2 == 0)
                         Bt.Background = Brushes.Gray;
                     else
-                        Bt.Background = Brushes.LightGray;
+                        Bt.Background = Brushes.LightGray; 
                     Bt.Width = ButtonSize;
                     Bt.Height = ButtonSize;
                     Bt.Click += Check_Click;
@@ -68,39 +143,50 @@ namespace Gomoku
             }
         }
         #endregion
-
+        
         #region Socket
         bool Connected = false;
         private void SocketConnect()
         {
             GomokuSocket.On(Socket.EVENT_CONNECT, () =>
             {
-                this.Dispatcher.Invoke((Action)(() =>
+                this.Dispatcher.Invoke(() =>
                 {
                     PushMessage("Connected", "Server");
-                }));
+                });
                
             });
             GomokuSocket.On(Socket.EVENT_MESSAGE, (data) =>
             {
-                this.Dispatcher.Invoke((Action)(() =>
+                this.Dispatcher.Invoke(() =>
                 {
-                    
                     PushMessage(((JObject)data)["message"].ToString(), ((JObject)data)["from"].ToString());
-                }));
+                });
                 
             });
             GomokuSocket.On(Socket.EVENT_CONNECT_ERROR, (data) =>
             {
-                this.Dispatcher.Invoke((Action)(() =>
+                this.Dispatcher.Invoke(() =>
                 {
 
                     PushMessage(((JObject)data)["message"].ToString(), "Server");
-                }));
+                });
             });
+            
+            GomokuSocket.On(Socket.EVENT_ERROR, (data) =>
+            {
+                this.Dispatcher.Invoke(() =>
+                {
+                    PushMessage(((JObject)data)["message"].ToString(), "Server");
+                });
+            });
+        }
+        
+        private void ChatConnect()
+        {
             GomokuSocket.On("ChatMessage", (data) =>
             {
-                this.Dispatcher.Invoke((Action)(() =>
+                this.Dispatcher.Invoke(() =>
                 {
                     string From = "";
                     try
@@ -112,16 +198,16 @@ namespace Gomoku
                         From = "Server"; //If not, It was from "Server" :D
                     }
                     PushMessage(((JObject)data)["message"].ToString(), From);
-                }));
+                });
 
                 if (((JObject)data)["message"].ToString() == "Welcome!")
                 {
                     GomokuSocket.Emit("MyNameIs", MyName);
                     Connected = true;
-                    this.Dispatcher.Invoke((Action)(() =>
+                    this.Dispatcher.Invoke(() =>
                     {
                         NameChangeBt.IsEnabled = true;
-                    }));
+                    });
                 }
 
                 if (((JObject)data)["message"].ToString().EndsWith("first player!") == true)
@@ -130,34 +216,30 @@ namespace Gomoku
                 }
 
             });
-            GomokuSocket.On(Socket.EVENT_ERROR, (data) =>
-            {
-                this.Dispatcher.Invoke((Action)(() =>
-                {
-                    PushMessage(((JObject)data)["message"].ToString(), "Server");
-                }));
-            });
+        }
 
+        private void GamePlayConnect()
+        {
             GomokuSocket.On("NextStepIs", (data) =>
             {
                 int Row = (int)((JObject)data)["row"];
                 int Col = (int)((JObject)data)["col"];
-                this.Dispatcher.Invoke((Action)(() =>
+                this.Dispatcher.Invoke(() =>
                 {
                     Check(false, CaroButt[Row, Col]);
-                }));
+                });
             });
 
             GomokuSocket.On("EndGame", (data) =>
             {
-                this.Dispatcher.Invoke((Action)(() =>
+                this.Dispatcher.Invoke(() =>
                 {
-                    MessageBox.Show(((JObject)data)["message"].ToString(),"We have a winner!");
+                    MessageBox.Show(((JObject)data)["message"].ToString(), "The game is now stopped!");
                     NewGame();
-                }));
+                });
             });
-           
         }
+
         #endregion
 
         #region Resizing
@@ -295,30 +377,61 @@ namespace Gomoku
                 ChatTb.Text = "";
                 ChatTb.Foreground = Brushes.Black;
             }
-              
-              
         }
 
         #endregion
 
         #region Checking
+
         private void Check_Click(object sender, RoutedEventArgs e)
         {
             Button Bt = (Button)sender;
             BoxInformation Infor = (BoxInformation)Bt.Tag;
-            int i = Infor.Row;
-            int j = Infor.Col;
-            
-            if (YourTurn == true)
-            {
-                Check(true, Bt);
-            }
-            else
-            {
-                PushMessage("That's not your turn", "Server");
-            }
+            int Row = Infor.Row;
+            int Col = Infor.Col;
 
-            MessageBox.Show("Row = " + i.ToString() + "\r\nCol = " + j.ToString() + "\r\nChecked = " + Infor.Checked, "Position");
+            if (isWaiting)
+                return;
+
+            if (Board.CurrentMode == PlayMode.Offline || Board.CurrentMode == PlayMode.Machine)
+            {
+                Brush BackupBackGround = Bt.Background;
+
+                if (Board.PlayingPlayer == State.Player1)
+                    Bt.Background = Brushes.Black;
+                if (Board.PlayingPlayer == State.Player2)
+                    Bt.Background = Brushes.White;
+
+                this.Dispatcher.Invoke(() =>
+                {
+                    if (!PlayBoard.Place(Row, Col))
+                        Bt.Background = BackupBackGround;
+                });
+
+                if (isWin)
+                {
+                    isWin = false;
+                    return;
+                }
+
+                if (Board.CurrentMode == PlayMode.Machine)
+                {
+                    isWaiting = true;
+                    Mouse.OverrideCursor = Cursors.Wait;
+                }
+
+            }
+            if (Board.CurrentMode == PlayMode.Online)
+            {  
+                if (YourTurn == true)
+                {
+                    Check(true, Bt);
+                }
+                else
+                {
+                    PushMessage("That's not your turn", "Server");
+                }
+            }
         }
 
         private void Check(bool isMe, Button BeCheckedButt)
@@ -344,16 +457,7 @@ namespace Gomoku
             YourTurn = !YourTurn;
         }
         #endregion
-
-        #region TestThread
-        private void chatThread()
-        {
-           
-        }
-
-
-        #endregion
-
+        
         #region Reset
         private void NewGame()
         {
@@ -361,15 +465,25 @@ namespace Gomoku
             YourTurn = false;
             isConnectedToPeople = false;
 
-            foreach (Button Bt in CaroButt)
+            ResetButton();
+        }
+
+        private void ResetButton()
+        {
+            this.Dispatcher.Invoke(() =>
             {
-                BoxInformation Infor = (BoxInformation)Bt.Tag;
-                Infor.Checked = false;
-                if ((Infor.Row + Infor.Col) % 2 == 0)
-                    Bt.Background = Brushes.Gray;
-                else
-                    Bt.Background = Brushes.LightGray;
-            }
+                foreach (Button Bt in CaroButt)
+                {
+                    BoxInformation Infor = (BoxInformation)Bt.Tag;
+                    Infor.Checked = false;
+                    if ((Infor.Row + Infor.Col) % 2 == 0)
+                        Bt.Background = Brushes.Gray;
+                    else
+                        Bt.Background = Brushes.LightGray;
+                }
+                
+            });
+            
         }
         #endregion
     }
