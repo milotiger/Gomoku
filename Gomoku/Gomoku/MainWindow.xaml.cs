@@ -1,17 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Configuration;
 using System.Threading;
-using System.Threading.Tasks;
+using System.Web.Configuration;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
 using System.Windows.Shapes;
 using Newtonsoft.Json.Linq;
 using Quobject.SocketIoClientDotNet.Client;
@@ -27,13 +21,16 @@ namespace Gomoku
         Online,
         Offline,
         Machine,
+        MachineVsOnline
     }
     public partial class MainWindow : Window
     {
-        Button[,] CaroButt;
-        Socket GomokuSocket;
+        Button[,] CaroButt; //Buttons Array
+        Socket GomokuSocket; //Socket to Gomoku server
+
         bool YourTurn = false;
-        Board PlayBoard = new Board();
+        Board PlayBoard = new Board(); 
+
         private bool isWaiting = false;
         private bool isWin = false;
 
@@ -45,7 +42,7 @@ namespace Gomoku
             Board.Notify += BoardOnNotify;
             Board.WinNotify += BoardOnWinNotify;
             Board.CurrentMode = PlayMode.Machine;
-            AI.AIPlaceNotify += AI_AIPlaceNotify;
+            AI.AIPlaceNotify += AIPlaceNotify;
 
             ModePicker modePicker = new ModePicker() {WindowStartupLocation = WindowStartupLocation.CenterScreen};
             if (modePicker.ShowDialog() == true)
@@ -58,17 +55,67 @@ namespace Gomoku
             
         }
 
-        private void AI_AIPlaceNotify(int Row, int Col)
+        #region Loaded
+        private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            PlaceToUI(Row, Col);
+            CreatePlayGround();
+            ChatTb.Focus();
+            MyName = NameTb.Text;
+            if (Board.CurrentMode == PlayMode.Online || Board.CurrentMode == PlayMode.MachineVsOnline)
+            {
+                GomokuSocket = IO.Socket(WebConfigurationManager.AppSettings.Get("ServerAddress"));
+                InitConnect(); //Initialize Connect
+                ChatConnect(); //Create Thread for chatting
+                GamePlayConnect(); //Create Threads for playing
+            }
         }
 
+        private void CreatePlayGround()
+        {
+            int ButtonSize = (int)Math.Min(PlayBound.ActualWidth, PlayBound.ActualHeight) / 12;
+            CaroButt = new Button[12, 12];
+            for (int i = 0; i < 12; i++)
+            {
+                WrapPanel Wp = new WrapPanel();
+                PlayPanel.Children.Add(Wp);
+                for (int j = 0; j < 12; j++)
+                {
+                    Button Bt = new Button();
+                    Bt.Tag = new BoxInformation { Row = i, Col = j, Checked = false };
+                    if ((i + j) % 2 == 0)
+                        Bt.Background = Brushes.Gray;
+                    else
+                        Bt.Background = Brushes.LightGray;
+                    Bt.Width = ButtonSize;
+                    Bt.Height = ButtonSize;
+                    Bt.Click += Check_Click;
+
+                    Wp.Children.Add(Bt);
+                    CaroButt[i, j] = Bt;
+                }
+            }
+        }
+        #endregion
+
+        #region Event Delegate
+        private void AIPlaceNotify(int Row, int Col)
+        {
+            PlaceToUI(Row, Col);
+            if (Board.CurrentMode == PlayMode.MachineVsOnline)
+                GomokuSocket.Emit("MyStepIs", JObject.FromObject(new { row = Row, col = Col }));
+        }
         private void PlaceToUI(int row, int col)
         {
             isWaiting = false;
             Button Bt = CaroButt[row, col];
             this.Dispatcher.Invoke(() =>
             {
+                if (Board.CurrentMode == PlayMode.MachineVsOnline)
+                {
+                    Bt.Background = Brushes.Black;
+                    return;
+                }
+
                 Brush BackupBackGround = Bt.Background;
 
                 if (Board.PlayingPlayer == State.Player1)
@@ -76,9 +123,10 @@ namespace Gomoku
                 if (Board.PlayingPlayer == State.Player2)
                     Bt.Background = Brushes.White;
                 Mouse.OverrideCursor = null;
+
+                
             });
         }
-
         private void BoardOnWinNotify(State player)
         {
             MessageBox.Show("Player " + player.ToString() + " win!");
@@ -95,58 +143,15 @@ namespace Gomoku
 
             Board.ResetBoard();
         }
-
-
         private void BoardOnNotify(string errorString)
         {
             MessageBox.Show(errorString);
-        }
-
-        #region Loaded
-        private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-            CreatePlayGround();
-            ChatTb.Focus();
-            MyName = NameTb.Text;
-            if (Board.CurrentMode == PlayMode.Online)
-            {
-                GomokuSocket = IO.Socket("ws://gomoku-lajosveres.rhcloud.com:8000");
-                SocketConnect(); //Initialze Connect
-                ChatConnect(); //Create Thread for chatting
-                GamePlayConnect(); //Create Threads for playing
-            }
-        }
-        
-        private void CreatePlayGround()
-        {
-            int ButtonSize = (int)Math.Min(PlayBound.ActualWidth, PlayBound.ActualHeight)/12;
-            CaroButt = new Button[12, 12];
-            for (int i = 0; i < 12; i++)
-            {
-                WrapPanel Wp = new WrapPanel();
-                PlayPanel.Children.Add(Wp);
-                for (int j = 0; j < 12; j++)
-                {
-                    Button Bt = new Button();
-                    Bt.Tag = new BoxInformation{ Row = i, Col = j, Checked = false };
-                    if ((i + j) % 2 == 0)
-                        Bt.Background = Brushes.Gray;
-                    else
-                        Bt.Background = Brushes.LightGray; 
-                    Bt.Width = ButtonSize;
-                    Bt.Height = ButtonSize;
-                    Bt.Click += Check_Click;
-                  
-                    Wp.Children.Add(Bt);
-                    CaroButt[i, j] = Bt;
-                }
-            }
         }
         #endregion
         
         #region Socket
         bool Connected = false;
-        private void SocketConnect()
+        private void InitConnect()
         {
             GomokuSocket.On(Socket.EVENT_CONNECT, () =>
             {
@@ -154,35 +159,10 @@ namespace Gomoku
                 {
                     PushMessage("Connected", "Server");
                 });
-               
-            });
-            GomokuSocket.On(Socket.EVENT_MESSAGE, (data) =>
-            {
-                this.Dispatcher.Invoke(() =>
-                {
-                    PushMessage(((JObject)data)["message"].ToString(), ((JObject)data)["from"].ToString());
-                });
-                
-            });
-            GomokuSocket.On(Socket.EVENT_CONNECT_ERROR, (data) =>
-            {
-                this.Dispatcher.Invoke(() =>
-                {
-
-                    PushMessage(((JObject)data)["message"].ToString(), "Server");
-                });
-            });
-            
-            GomokuSocket.On(Socket.EVENT_ERROR, (data) =>
-            {
-                this.Dispatcher.Invoke(() =>
-                {
-                    PushMessage(((JObject)data)["message"].ToString(), "Server");
-                });
             });
         }
         
-        private void ChatConnect()
+        private void ChatConnect() //Receive Message from server
         {
             GomokuSocket.On("ChatMessage", (data) =>
             {
@@ -213,23 +193,57 @@ namespace Gomoku
                 if (((JObject)data)["message"].ToString().EndsWith("first player!") == true)
                 {
                     YourTurn = true;
+                    if (Board.CurrentMode == PlayMode.MachineVsOnline)
+                        PlaceRandom();
                 }
 
             });
         }
 
+        private void PlaceRandom()
+        {
+            int Col = new Random().Next(0,11);
+            int Row = new Random().Next(0, 11);
+
+            AIPlaceNotify(Row, Col);
+            Board.PlayingPlayer = 3 - Board.PlayingPlayer;
+        }
+
         private void GamePlayConnect()
         {
+            PlaceFromOnline();
+            EndGameSignalFromOnline();
+        }
+
+
+        private void PlaceFromOnline()
+        {
+
             GomokuSocket.On("NextStepIs", (data) =>
             {
                 int Row = (int)((JObject)data)["row"];
                 int Col = (int)((JObject)data)["col"];
+
+                if ((int)((JObject)data)["player"] == 0) //1 is Me, 0 is Other;
+                    return;
+
                 this.Dispatcher.Invoke(() =>
                 {
                     Check(false, CaroButt[Row, Col]);
                 });
-            });
 
+                PlayBoard.Place(Row, Col);
+
+                if (Board.CurrentMode == PlayMode.MachineVsOnline)
+                {
+                    Thread AIThread = new Thread(PlayBoard.AIPlace); //Create a new thread to run AI algorithm
+                    AIThread.Start();
+                }
+            });
+        }
+
+        private void EndGameSignalFromOnline()
+        {
             GomokuSocket.On("EndGame", (data) =>
             {
                 this.Dispatcher.Invoke(() =>
@@ -346,6 +360,7 @@ namespace Gomoku
                 ChatTb.Focus();
             }
             MyName = NameTb.Text;
+
             GomokuSocket.Emit("MyNameIs", MyName);
         }
 
@@ -396,6 +411,7 @@ namespace Gomoku
             if (Board.CurrentMode == PlayMode.Offline || Board.CurrentMode == PlayMode.Machine)
             {
                 Brush BackupBackGround = Bt.Background;
+                bool isValid = true;
 
                 if (Board.PlayingPlayer == State.Player1)
                     Bt.Background = Brushes.Black;
@@ -404,8 +420,18 @@ namespace Gomoku
 
                 this.Dispatcher.Invoke(() =>
                 {
-                    if (!PlayBoard.Place(Row, Col))
+                    isValid = PlayBoard.Place(Row, Col);
+                    if (!isValid)
+                    { 
                         Bt.Background = BackupBackGround;
+                        return;
+                    }
+
+                    if (Board.CurrentMode == PlayMode.Machine)
+                    {
+                        Thread AIThread = new Thread(PlayBoard.AIPlace); //Create a new thread to run AI algorithm
+                        AIThread.Start();
+                    }
                 });
 
                 if (isWin)
@@ -414,10 +440,11 @@ namespace Gomoku
                     return;
                 }
 
-                if (Board.CurrentMode == PlayMode.Machine)
+                if (Board.CurrentMode == PlayMode.Machine && isValid)
                 {
                     isWaiting = true;
                     Mouse.OverrideCursor = Cursors.Wait;
+
                 }
 
             }

@@ -48,56 +48,29 @@ namespace Gomoku
 
         public bool Place(int Row, int Col)
         {
-            if (Board.CurrentMode == PlayMode.Offline)
+            if (ChessBoard[Row, Col] != State.Free)
             {
-                if (ChessBoard[Row, Col] != State.Free)
-                {
-                    Notify?.Invoke("You Cannot Place Here!");
-                    return false;
-                }
-
-                ChessBoard[Row, Col] = PlayingPlayer;
-
-                if (CheckGame.CheckWin(Row, Col) == 4)
-                {
-                    WinNotify?.Invoke(PlayingPlayer);
-                    return true;
-                }
-
-                PlayingPlayer = (State)(3 - (int)PlayingPlayer); //Change player
+                Notify?.Invoke("You Cannot Place Here!");
+                return false;
             }
 
-            if (Board.CurrentMode == PlayMode.Machine)
+            ChessBoard[Row, Col] = PlayingPlayer;
+
+            if (CheckGame.CheckWin(Row, Col) == 4)
             {
-                if (ChessBoard[Row, Col] != State.Free)
-                {
-                    Notify?.Invoke("You Cannot Place Here!");
-                    return false;
-                }
-
-                ChessBoard[Row, Col] = PlayingPlayer;
-
-                if (CheckGame.CheckWin(Row, Col) == 4) //Check if player Win
-                {
-                    WinNotify?.Invoke(PlayingPlayer);
-                    return true;
-                }
-
-                Thread AIThread = new Thread(AIPlace); //Create a new thread to run AI algorithm
-                AIThread.Start();
-
-
-
+                WinNotify?.Invoke(PlayingPlayer);
+                return true;
             }
-            
+
+            PlayingPlayer = (State)(3 - (int)PlayingPlayer); //Change player
+
             return true;
         }
 
-        private void AIPlace()
+        public void AIPlace()
         {
-            PlayingPlayer = (State)(3 - (int)PlayingPlayer); //Change player
-
             AI.Place();
+
             if (CheckGame.CheckWin(AI.AIRow, AI.AICol) == 4)
             {
                 WinNotify?.Invoke(PlayingPlayer);

@@ -12,7 +12,7 @@ namespace Gomoku
     {
         public static void Place()
         {
-            Thread.Sleep(500); //Simulate delay
+            //Thread.Sleep(500); //Simulate delay
             AIStart();
             Board.ChessBoard[AIRow, AICol] = Board.PlayingPlayer;
             AIPlaceNotify?.Invoke(AIRow, AICol);
@@ -65,7 +65,7 @@ namespace Gomoku
                     AIBoard[c, r] = 0;
         }
 
-        public static Point MaxPos()
+        public static Point MaxPos()    
         {
             int Max = 0;
             Point p = new Point();
@@ -266,13 +266,15 @@ namespace Gomoku
                     humanMove = HumanMove[i];
                     Board.ChessBoard[(int)humanMove.Y, (int)humanMove.X] = Human;
 
-                    Board.PlayingPlayer = Human;
+                    //Board.PlayingPlayer = Human;
+                    Board.PlayingPlayer = PC;
                     if (CheckGame.CheckWin((int)humanMove.Y, (int)humanMove.X) == 4)
                     {
                         fWin = true;
                     }
 
-                    Board.PlayingPlayer = PC;
+                    //Board.PlayingPlayer = PC;
+                    Board.PlayingPlayer = Human;
                     if (CheckGame.CheckWin((int)humanMove.Y, (int)humanMove.X) == 4)
                     {
                         isLose = true;
@@ -301,8 +303,12 @@ namespace Gomoku
 
         public static void AIStart()
         {
-            Human = 3 - Board.PlayingPlayer;
-            PC = Board.PlayingPlayer;
+            //Human = 3 - Board.PlayingPlayer;
+            //PC = Board.PlayingPlayer;
+
+            Human = Board.PlayingPlayer;
+            PC = 3 - Board.PlayingPlayer;
+
 
             for (int i = 0; i < maxMove; i++)
             {
