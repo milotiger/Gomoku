@@ -65,7 +65,7 @@ namespace Gomoku
                     AIBoard[c, r] = 0;
         }
 
-        public static Point MaxPos()    
+        public static Point MaxPos()
         {
             int Max = 0;
             Point p = new Point();
@@ -224,7 +224,7 @@ namespace Gomoku
         {
             if (depth > maxDepth) return;
             depth++;
-            
+
             fWin = false;
             //bool fLose = false;
             Point pcMove = new Point();
@@ -264,18 +264,15 @@ namespace Gomoku
                 for (int i = 0; i < maxMove; i++)
                 {
                     humanMove = HumanMove[i];
-                    Board.ChessBoard[(int)humanMove.Y, (int)humanMove.X] = Human;
 
-                    //Board.PlayingPlayer = Human;
-                    Board.PlayingPlayer = PC;
-                    if (CheckGame.CheckWin((int)humanMove.Y, (int)humanMove.X) == 4)
+                    Board.ChessBoard[(int)humanMove.Y, (int)humanMove.X] = PC;
+                    if (CheckGame.CheckWin((int)humanMove.Y, (int)humanMove.X))
                     {
                         fWin = true;
                     }
 
-                    //Board.PlayingPlayer = PC;
-                    Board.PlayingPlayer = Human;
-                    if (CheckGame.CheckWin((int)humanMove.Y, (int)humanMove.X) == 4)
+                    Board.ChessBoard[(int)humanMove.Y, (int)humanMove.X] = Human;
+                    if (CheckGame.CheckWin((int)humanMove.Y, (int)humanMove.X))
                     {
                         isLose = true;
                     }
