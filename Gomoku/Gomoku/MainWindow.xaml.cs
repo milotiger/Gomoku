@@ -549,7 +549,8 @@ namespace Gomoku
             NameChangeBt.IsEnabled = false;
 
             GameInit();
-            ResetButton();
+            //ResetButton();
+            NewGame();
             Board.ResetBoard();
             Board.PlayingPlayer = State.Player1;
         }

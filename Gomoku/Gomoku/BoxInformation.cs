@@ -12,43 +12,13 @@ namespace Gomoku
         private int m_Col;
         private bool m_Checked;
 
-        public int Row
-        {
-            get
-            {
-                return m_Row;
-            }
+        public int Row { get; set; }
+       
 
-            set
-            {
-                m_Row = value;
-            }
-        }
+        public int Col { get; set; }
+      
 
-        public int Col
-        {
-            get
-            {
-                return m_Col;
-            }
-
-            set
-            {
-                m_Col = value;
-            }
-        }
-
-        public bool Checked
-        {
-            get
-            {
-                return m_Checked;
-            }
-
-            set
-            {
-                m_Checked = value;
-            }
-        }
+        public bool Checked { get; set; }
+   
     }
 }

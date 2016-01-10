@@ -65,7 +65,7 @@ namespace Gomoku
                     AIBoard[c, r] = 0;
         }
 
-        public static Point MaxPos()
+        public static Point MaxPos()    
         {
             int Max = 0;
             Point p = new Point();
@@ -224,7 +224,7 @@ namespace Gomoku
         {
             if (depth > maxDepth) return;
             depth++;
-
+            
             fWin = false;
             //bool fLose = false;
             Point pcMove = new Point();

@@ -113,7 +113,7 @@ namespace Gomoku
             Check = Math.Max(Check, D1Check);
             Check = Math.Max(Check, D2Check);
 
-            return (Check>=4);
+            return Check >= 4;
         }
         private static int DownCheck(int Row, int Col)
         {
