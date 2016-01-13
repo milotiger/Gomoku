@@ -16,7 +16,7 @@ namespace Gomoku
     /// Interaction logic for MainWindow.xaml
     /// </summary>
 
-    public enum PlayMode
+    public enum PlayMode    
     {
         Online,
         Offline,
@@ -44,20 +44,31 @@ namespace Gomoku
             Board.CurrentMode = PlayMode.Machine;
             AI.AIPlaceNotify += AIPlaceNotify;
 
-            ModePicker modePicker = new ModePicker() {WindowStartupLocation = WindowStartupLocation.CenterScreen};
+            ModePicking();
+        }
+
+        #region Loaded
+
+        private void ModePicking()
+        {
+            ModePicker modePicker = new ModePicker() { WindowStartupLocation = WindowStartupLocation.CenterScreen };
             if (modePicker.ShowDialog() == true)
             {
                 Board.CurrentMode = modePicker.Mode;
                 MyName = modePicker.MyName;
                 NameTb.Text = MyName;
-                this.Title += " - " +Board.CurrentMode.ToString();
+                this.Title = "Gomoku" + " - " + Board.CurrentMode.ToString();
             }
-            
+            //GameInit();
         }
-
-        #region Loaded
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            GameInit();
+        }
+
+        private void GameInit()
+        {
+            PlayPanel.Children.Clear();
             CreatePlayGround();
             ChatTb.Focus();
             MyName = NameTb.Text;
@@ -69,7 +80,6 @@ namespace Gomoku
                 GamePlayConnect(); //Create Threads for playing
             }
         }
-
         private void CreatePlayGround()
         {
             int ButtonSize = (int)Math.Min(PlayBound.ActualWidth, PlayBound.ActualHeight) / 12;
@@ -123,13 +133,11 @@ namespace Gomoku
                 if (Board.PlayingPlayer == State.Player2)
                     Bt.Background = Brushes.White;
                 Mouse.OverrideCursor = null;
-
-                
             });
         }
         private void BoardOnWinNotify(State player)
         {
-            MessageBox.Show("Player " + player.ToString() + " win!");
+            MessageBox.Show("Player " + player.ToString() + " win!","We have a Winner", MessageBoxButton.OK, MessageBoxImage.Information);
             ResetButton();
             
             isWaiting = false;
@@ -275,7 +283,7 @@ namespace Gomoku
    
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            ChatRow.Height = this.Height - 150;
+            ChatRow.Height = this.Height - 180;
         }
 
         private void PlayGround_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -342,7 +350,15 @@ namespace Gomoku
         private void PushMessage_Click(object sender, RoutedEventArgs e)
         {
             //PushMessage(ChatTb.Text, YourName);
-            GomokuSocket.Emit("ChatMessage", ChatTb.Text);
+            if (Board.CurrentMode == PlayMode.Machine || Board.CurrentMode == PlayMode.Offline)
+            {
+                PushMessage(ChatTb.Text, MyName);
+            }
+            else
+            {
+                GomokuSocket.Emit("ChatMessage", ChatTb.Text);
+            }
+                
         }
 
         string MyName;
@@ -374,7 +390,16 @@ namespace Gomoku
         private void TextBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter)
-                GomokuSocket.Emit("ChatMessage", ChatTb.Text);
+            {
+                if (Board.CurrentMode == PlayMode.Machine || Board.CurrentMode == PlayMode.Offline)
+                {
+                    PushMessage(ChatTb.Text, MyName);
+                }
+                else
+                {
+                    GomokuSocket.Emit("ChatMessage", ChatTb.Text);
+                }
+            }
         }
 
         private void TextBox_LostFocus(object sender, RoutedEventArgs e)
@@ -513,6 +538,21 @@ namespace Gomoku
             
         }
         #endregion
+
+        private void ChangeMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (Board.CurrentMode == PlayMode.Online || Board.CurrentMode == PlayMode.MachineVsOnline)
+                GomokuSocket.Disconnect();
+
+            ModePicking();
+            
+            NameChangeBt.IsEnabled = false;
+
+            GameInit();
+            ResetButton();
+            Board.ResetBoard();
+            Board.PlayingPlayer = State.Player1;
+        }
     }
 }
 

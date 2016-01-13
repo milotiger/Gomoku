@@ -34,7 +34,7 @@
     <DockPanel LastChildFill="True">
         <StackPanel DockPanel.Dock="Right" Width="250">
             <WrapPanel Margin="10,10,0,0">
-                <Label>Yourname:</Label>
+                <Label>Your Name:</Label>
                 <TextBox Name="NameTb" Width="80"  VerticalContentAlignment="Center">GuestWinDev</TextBox>
                 <Button Name="NameChangeBt" Margin="10,0,0,0" Click="NameChanged_Click" IsEnabled="False" Width="70">NewGame!</Button>
             </WrapPanel>
@@ -56,9 +56,10 @@
                 </ScrollViewer>
                 <WrapPanel Grid.Row="2" Margin="10,5,0,0">
                     <TextBox Name="ChatTb" Width="150" KeyDown="TextBox_KeyDown" LostFocus="TextBox_LostFocus" GotFocus="TextBox_GotFocus" Foreground="Gray">Type and press Enter</TextBox>
-                    <Button Background="#EC971F" Foreground="White" Width="50" Click="PushMessage_Click">Send</Button>
+                    <Button Background="#EC971F" Foreground="White" Width="50" Click="PushMessage_Click" Name="BtSend">Send</Button>
                 </WrapPanel>
             </Grid>
+            <Button Width="80" HorizontalAlignment="Right" Margin ="0,0,10,0" Click="ChangeMode_Click">Change Mode</Button>
         </StackPanel>
         <Grid Margin="10" SizeChanged="PlayGround_SizeChanged" Name="PlayBound">
             <StackPanel Name="PlayPanel" VerticalAlignment="Center" HorizontalAlignment="Center"></StackPanel>

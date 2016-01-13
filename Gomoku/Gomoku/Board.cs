@@ -56,7 +56,7 @@ namespace Gomoku
 
             ChessBoard[Row, Col] = PlayingPlayer;
 
-            if (CheckGame.CheckWin(Row, Col) == 4)
+            if (CheckGame.CheckWin(Row, Col))
             {
                 WinNotify?.Invoke(PlayingPlayer);
                 return true;
@@ -71,7 +71,7 @@ namespace Gomoku
         {
             AI.Place();
 
-            if (CheckGame.CheckWin(AI.AIRow, AI.AICol) == 4)
+            if (CheckGame.CheckWin(AI.AIRow, AI.AICol))
             {
                 WinNotify?.Invoke(PlayingPlayer);
                 return;
@@ -100,7 +100,7 @@ namespace Gomoku
 
     public class CheckGame
     {
-        public static int CheckWin(int Row, int Col)
+        public static bool CheckWin(int Row, int Col)
         {
             int Check = 0;
 
@@ -113,7 +113,7 @@ namespace Gomoku
             Check = Math.Max(Check, D1Check);
             Check = Math.Max(Check, D2Check);
 
-            return Check;
+            return (Check>=4);
         }
         private static int DownCheck(int Row, int Col)
         {
